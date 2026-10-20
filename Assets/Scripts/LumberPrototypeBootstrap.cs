@@ -9,6 +9,8 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     Camera cam;
     Animator animator;
     bool wasMoving;
+    int idleHash;
+    int walkHash;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart()
@@ -21,6 +23,8 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     {
         foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None)) Destroy(c.gameObject);
         RenderSettings.ambientLight = new Color(.72f,.76f,.68f);
+        idleHash = Animator.StringToHash("Idle");
+        walkHash = Animator.StringToHash("Walking");
         MakeGround(); MakeLight(); MakeCamera(); MakePlayer(); MakeForest(); MakeSawmill();
     }
 
@@ -30,14 +34,28 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         Vector3 d = new Vector3(input.x,0,input.y).normalized;
         bool moving = d.sqrMagnitude > .01f;
+
         if (moving)
         {
-            player.position += d * 4f * Time.deltaTime;
+            player.position += d * 3.6f * Time.deltaTime;
             player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(d), 14f * Time.deltaTime);
         }
-        if (animator != null && moving != wasMoving)
-            animator.CrossFade(moving ? "Walking" : "Idle", .12f);
+
+        if (animator != null)
+        {
+            if (moving)
+            {
+                var state = animator.GetCurrentAnimatorStateInfo(0);
+                if (!state.IsName("Walking") || (!animator.IsInTransition(0) && state.normalizedTime >= .95f))
+                    animator.CrossFade(walkHash, .08f, 0, 0f);
+            }
+            else if (wasMoving)
+            {
+                animator.CrossFade(idleHash, .10f, 0, 0f);
+            }
+        }
         wasMoving = moving;
+
         if (cam != null)
         {
             Vector3 target = player.position + new Vector3(9.5f,11f,-9.5f);
@@ -57,7 +75,11 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         obj.name = "Lumberjack - Character 06";
         obj.transform.localScale = Vector3.one * 1.45f;
         animator = obj.GetComponentInChildren<Animator>();
-        if (animator != null) animator.Play("Idle",0,0);
+        if (animator != null)
+        {
+            animator.applyRootMotion = false;
+            animator.Play(idleHash,0,0);
+        }
         player = obj.transform;
     }
 
