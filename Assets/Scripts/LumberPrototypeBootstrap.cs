@@ -1,24 +1,22 @@
 using UnityEngine;
+using UnityEngine.Playables;
+using UnityEngine.Animations;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 public class LumberPrototypeBootstrap : MonoBehaviour
 {
-    Transform player;
-    Camera cam;
-    Animator animator;
+    Transform player; Camera cam; Animator animator;
     RuntimeAnimatorController normalController;
-    AnimatorOverrideController runController;
-    AnimationClip walkClip;
-    AnimationClip runClip;
-    bool wasMoving;
-    bool wasRunning;
+    AnimationClip walkClip, runClip;
+    PlayableGraph runGraph;
+    bool runGraphActive, wasMoving, wasRunning;
     float moveHeldTime;
 
-    const float WalkSpeed = 2.6f;
-    const float RunSpeed = 6.5f;
-    const float RunDelay = 30.0f;
+    const float WalkSpeed=2.6f;
+    const float RunSpeed=6.5f;
+    const float RunDelay=30f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart(){if(FindFirstObjectByType<LumberPrototypeBootstrap>()==null)new GameObject("Lumber Empire Demo").AddComponent<LumberPrototypeBootstrap>();}
@@ -28,7 +26,7 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     void Update()
     {
         if(player==null)return;
-        Vector2 input=new Vector2(Input.GetAxisRaw("Horizontal"),Input.GetAxisRaw("Vertical"));
+        Vector2 input=new(Input.GetAxisRaw("Horizontal"),Input.GetAxisRaw("Vertical"));
         Vector3 d=new Vector3(input.x,0,input.y).normalized;
         bool moving=d.sqrMagnitude>.01f;
         moveHeldTime=moving?moveHeldTime+Time.deltaTime:0f;
@@ -39,18 +37,23 @@ public class LumberPrototypeBootstrap : MonoBehaviour
 
         if(animator!=null)
         {
-            if(!moving&&wasMoving) FreezeStandingPose();
-            else if(moving&&!wasMoving) StartWalking();
-            else if(moving&&running&&!wasRunning) StartRunning();
+            if(!moving&&wasMoving)FreezeStandingPose();
+            else if(moving&&!wasMoving)StartWalking();
+            else if(running&&!wasRunning)StartRunning();
         }
         wasMoving=moving;wasRunning=running;
-
         if(cam!=null){Vector3 target=player.position+new Vector3(9.5f,11f,-9.5f);cam.transform.position=Vector3.Lerp(cam.transform.position,target,5f*Time.deltaTime);}
+    }
+
+    void StopRunGraph()
+    {
+        if(runGraphActive&&runGraph.IsValid()){runGraph.Destroy();runGraphActive=false;}
+        if(animator!=null)animator.runtimeAnimatorController=normalController;
     }
 
     void StartWalking()
     {
-        animator.runtimeAnimatorController=normalController;
+        StopRunGraph();
         animator.speed=1f;
         animator.Play("Walking",0,0f);
         animator.Update(0f);
@@ -58,22 +61,24 @@ public class LumberPrototypeBootstrap : MonoBehaviour
 
     void StartRunning()
     {
-        if(runController==null||runClip==null){Debug.LogError("RUN CLIP NOT LOADED");return;}
-        animator.runtimeAnimatorController=runController;
-        animator.speed=1.35f;
-        animator.Play("Walking",0,0f);
-        animator.Update(0f);
-        Debug.Log("RUNNING ACTIVATED AFTER 30 SECONDS");
+        if(runClip==null){Debug.LogError("Running.anim was not loaded");return;}
+        StopRunGraph();
+        AnimationClipPlayable playable=AnimationPlayableUtilities.PlayClip(animator,runClip,out runGraph);
+        playable.SetSpeed(1.15);
+        runGraphActive=true;
+        Debug.Log("REAL RUN ANIMATION ACTIVE");
     }
 
     void FreezeStandingPose()
     {
-        animator.runtimeAnimatorController=normalController;
+        StopRunGraph();
         animator.speed=1f;
         animator.Play("Walking",0,.08f);
         animator.Update(0f);
         animator.speed=0f;
     }
+
+    void OnDestroy(){if(runGraphActive&&runGraph.IsValid())runGraph.Destroy();}
 
     void MakePlayer()
     {
@@ -88,17 +93,7 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         var root=new GameObject("Lumberjack Player");
         var obj=Instantiate(prefab,root.transform);obj.name="Character 06 Visual";obj.transform.localPosition=Vector3.zero;obj.transform.localRotation=Quaternion.identity;obj.transform.localScale=Vector3.one*1.45f;
         animator=obj.GetComponentInChildren<Animator>();
-        if(animator!=null)
-        {
-            animator.applyRootMotion=false;animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;
-            normalController=animator.runtimeAnimatorController;
-            if(normalController!=null&&runClip!=null)
-            {
-                runController=new AnimatorOverrideController(normalController);
-                runController["Walking"]=runClip;
-            }
-            animator.Rebind();FreezeStandingPose();
-        }
+        if(animator!=null){animator.applyRootMotion=false;animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;normalController=animator.runtimeAnimatorController;animator.Rebind();FreezeStandingPose();}
         GroundVisual(obj,0f);player=root.transform;
     }
 
