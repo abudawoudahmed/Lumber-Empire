@@ -8,9 +8,9 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     Transform player;
     Camera cam;
     Animator animator;
+    AnimationClip idleClip;
+    AnimationClip walkClip;
     bool wasMoving;
-    int idleHash;
-    int walkHash;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart()
@@ -23,8 +23,6 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     {
         foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None)) Destroy(c.gameObject);
         RenderSettings.ambientLight = new Color(.72f,.76f,.68f);
-        idleHash = Animator.StringToHash("Idle");
-        walkHash = Animator.StringToHash("Walking");
         MakeGround(); MakeLight(); MakeCamera(); MakePlayer(); MakeForest(); MakeSawmill();
     }
 
@@ -37,22 +35,13 @@ public class LumberPrototypeBootstrap : MonoBehaviour
 
         if (moving)
         {
-            player.position += d * 3.6f * Time.deltaTime;
-            player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(d), 14f * Time.deltaTime);
+            player.position += d * 3.0f * Time.deltaTime;
+            player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(d), 11f * Time.deltaTime);
         }
 
-        if (animator != null)
+        if (animator != null && moving != wasMoving)
         {
-            if (moving)
-            {
-                var state = animator.GetCurrentAnimatorStateInfo(0);
-                if (!state.IsName("Walking") || (!animator.IsInTransition(0) && state.normalizedTime >= .95f))
-                    animator.CrossFade(walkHash, .08f, 0, 0f);
-            }
-            else if (wasMoving)
-            {
-                animator.CrossFade(idleHash, .10f, 0, 0f);
-            }
+            animator.CrossFade(moving ? "Walking" : "Idle", .12f, 0, 0f);
         }
         wasMoving = moving;
 
@@ -68,19 +57,41 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         GameObject prefab = null;
 #if UNITY_EDITOR
         prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Prefabs/Character 06.prefab");
+        idleClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Idle.anim");
+        walkClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Walking.anim");
 #endif
         if (prefab == null) prefab = Resources.Load<GameObject>("Lumberjack/Character 06");
         if (prefab == null) { Debug.LogError("Character 06 prefab not found."); return; }
-        var obj = Instantiate(prefab, Vector3.zero, Quaternion.identity);
-        obj.name = "Lumberjack - Character 06";
+
+        var root = new GameObject("Lumberjack Player");
+        root.transform.position = Vector3.zero;
+        var obj = Instantiate(prefab, root.transform);
+        obj.name = "Character 06 Visual";
+        obj.transform.localPosition = Vector3.zero;
+        obj.transform.localRotation = Quaternion.identity;
         obj.transform.localScale = Vector3.one * 1.45f;
+
         animator = obj.GetComponentInChildren<Animator>();
         if (animator != null)
         {
             animator.applyRootMotion = false;
-            animator.Play(idleHash,0,0);
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            animator.Play("Idle",0,0f);
+            animator.Update(0f);
         }
-        player = obj.transform;
+
+        // The supplied character prefab has its visual origin below the soles.
+        // Measure the rendered feet after scale/pose and lift only the visual child,
+        // keeping the gameplay root exactly on ground Y=0.
+        var renderers = obj.GetComponentsInChildren<Renderer>();
+        if (renderers.Length > 0)
+        {
+            float minY = float.PositiveInfinity;
+            foreach (var r in renderers) minY = Mathf.Min(minY, r.bounds.min.y);
+            obj.transform.position += Vector3.up * (root.transform.position.y - minY + .02f);
+        }
+
+        player = root.transform;
     }
 
     void MakeGround(){var g=GameObject.CreatePrimitive(PrimitiveType.Plane);g.name="Forest Clearing";g.transform.localScale=new Vector3(3.2f,1,3.2f);g.GetComponent<Renderer>().material.color=new Color(.36f,.64f,.25f);}
