@@ -15,88 +15,23 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     float moveHeldTime;
 
     const float WalkSpeed=2.6f;
-    const float RunSpeed=6.5f;
-    const float RunDelay=30f;
+    const float RunSpeed=7.2f;
+    const float RunDelay=2f; // verification: restore to 30 after run animation is confirmed
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart(){if(FindFirstObjectByType<LumberPrototypeBootstrap>()==null)new GameObject("Lumber Empire Demo").AddComponent<LumberPrototypeBootstrap>();}
-
     void Start(){foreach(var c in FindObjectsByType<Camera>(FindObjectsSortMode.None))Destroy(c.gameObject);RenderSettings.ambientLight=new Color(.72f,.76f,.68f);MakeGround();MakeLight();MakeCamera();MakePlayer();MakeForest();MakeSawmill();}
-
-    void Update()
-    {
-        if(player==null)return;
-        Vector2 input=new(Input.GetAxisRaw("Horizontal"),Input.GetAxisRaw("Vertical"));
-        Vector3 d=new Vector3(input.x,0,input.y).normalized;
-        bool moving=d.sqrMagnitude>.01f;
-        moveHeldTime=moving?moveHeldTime+Time.deltaTime:0f;
-        bool running=moving&&moveHeldTime>=RunDelay;
-        float speed=running?RunSpeed:WalkSpeed;
-
-        if(moving){player.position+=d*speed*Time.deltaTime;player.rotation=Quaternion.Slerp(player.rotation,Quaternion.LookRotation(d),12f*Time.deltaTime);}
-
-        if(animator!=null)
-        {
-            if(!moving&&wasMoving)FreezeStandingPose();
-            else if(moving&&!wasMoving)StartWalking();
-            else if(running&&!wasRunning)StartRunning();
-        }
-        wasMoving=moving;wasRunning=running;
-        if(cam!=null){Vector3 target=player.position+new Vector3(9.5f,11f,-9.5f);cam.transform.position=Vector3.Lerp(cam.transform.position,target,5f*Time.deltaTime);}
-    }
-
-    void StopRunGraph()
-    {
-        if(runGraphActive&&runGraph.IsValid()){runGraph.Destroy();runGraphActive=false;}
-        if(animator!=null)animator.runtimeAnimatorController=normalController;
-    }
-
-    void StartWalking()
-    {
-        StopRunGraph();
-        animator.speed=1f;
-        animator.Play("Walking",0,0f);
-        animator.Update(0f);
-    }
-
-    void StartRunning()
-    {
-        if(runClip==null){Debug.LogError("Running.anim was not loaded");return;}
-        StopRunGraph();
-        AnimationClipPlayable playable=AnimationPlayableUtilities.PlayClip(animator,runClip,out runGraph);
-        playable.SetSpeed(1.15);
-        runGraphActive=true;
-        Debug.Log("REAL RUN ANIMATION ACTIVE");
-    }
-
-    void FreezeStandingPose()
-    {
-        StopRunGraph();
-        animator.speed=1f;
-        animator.Play("Walking",0,.08f);
-        animator.Update(0f);
-        animator.speed=0f;
-    }
-
+    void Update(){if(player==null)return;Vector2 input=new(Input.GetAxisRaw("Horizontal"),Input.GetAxisRaw("Vertical"));Vector3 d=new Vector3(input.x,0,input.y).normalized;bool moving=d.sqrMagnitude>.01f;moveHeldTime=moving?moveHeldTime+Time.deltaTime:0f;bool running=moving&&moveHeldTime>=RunDelay;float speed=running?RunSpeed:WalkSpeed;if(moving){player.position+=d*speed*Time.deltaTime;player.rotation=Quaternion.Slerp(player.rotation,Quaternion.LookRotation(d),12f*Time.deltaTime);}if(animator!=null){if(!moving&&wasMoving)FreezeStandingPose();else if(moving&&!wasMoving)StartWalking();else if(running&&!wasRunning)StartRunning();}wasMoving=moving;wasRunning=running;if(cam!=null){Vector3 target=player.position+new Vector3(9.5f,11f,-9.5f);cam.transform.position=Vector3.Lerp(cam.transform.position,target,5f*Time.deltaTime);}}
+    void StopRunGraph(){if(runGraphActive&&runGraph.IsValid()){runGraph.Destroy();runGraphActive=false;}if(animator!=null)animator.runtimeAnimatorController=normalController;}
+    void StartWalking(){StopRunGraph();animator.speed=1f;animator.Play("Walking",0,0f);animator.Update(0f);}
+    void StartRunning(){if(runClip==null){Debug.LogError("RUNNING TEST FAILED: Running.anim not loaded");return;}StopRunGraph();var playable=AnimationPlayableUtilities.PlayClip(animator,runClip,out runGraph);playable.SetSpeed(1.25);runGraphActive=true;Debug.Log("RUNNING TEST ACTIVE - REAL Running.anim");}
+    void FreezeStandingPose(){StopRunGraph();animator.speed=1f;animator.Play("Walking",0,.08f);animator.Update(0f);animator.speed=0f;}
     void OnDestroy(){if(runGraphActive&&runGraph.IsValid())runGraph.Destroy();}
-
-    void MakePlayer()
-    {
-        GameObject prefab=null;
+    void MakePlayer(){GameObject prefab=null;
 #if UNITY_EDITOR
-        prefab=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Prefabs/Character 06.prefab");
-        walkClip=AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Walking.anim");
-        runClip=AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Running.anim");
+prefab=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Prefabs/Character 06.prefab");walkClip=AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Walking.anim");runClip=AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Running.anim");
 #endif
-        if(prefab==null)prefab=Resources.Load<GameObject>("Lumberjack/Character 06");
-        if(prefab==null){Debug.LogError("Character 06 prefab not found.");return;}
-        var root=new GameObject("Lumberjack Player");
-        var obj=Instantiate(prefab,root.transform);obj.name="Character 06 Visual";obj.transform.localPosition=Vector3.zero;obj.transform.localRotation=Quaternion.identity;obj.transform.localScale=Vector3.one*1.45f;
-        animator=obj.GetComponentInChildren<Animator>();
-        if(animator!=null){animator.applyRootMotion=false;animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;normalController=animator.runtimeAnimatorController;animator.Rebind();FreezeStandingPose();}
-        GroundVisual(obj,0f);player=root.transform;
-    }
-
+if(prefab==null)prefab=Resources.Load<GameObject>("Lumberjack/Character 06");if(prefab==null){Debug.LogError("Character 06 prefab not found.");return;}var root=new GameObject("Lumberjack Player");var obj=Instantiate(prefab,root.transform);obj.name="Character 06 Visual";obj.transform.localPosition=Vector3.zero;obj.transform.localRotation=Quaternion.identity;obj.transform.localScale=Vector3.one*1.45f;animator=obj.GetComponentInChildren<Animator>();if(animator!=null){animator.applyRootMotion=false;animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;normalController=animator.runtimeAnimatorController;animator.Rebind();FreezeStandingPose();}GroundVisual(obj,0f);player=root.transform;}
     void GroundVisual(GameObject visual,float groundY){var rs=visual.GetComponentsInChildren<Renderer>();if(rs.Length==0)return;float minY=float.PositiveInfinity;foreach(var r in rs)minY=Mathf.Min(minY,r.bounds.min.y);visual.transform.position+=Vector3.up*(groundY-minY+.02f);}
     void MakeGround(){var g=GameObject.CreatePrimitive(PrimitiveType.Plane);g.name="Forest Clearing";g.transform.localScale=new Vector3(3.2f,1,3.2f);g.GetComponent<Renderer>().material.color=new Color(.36f,.64f,.25f);}
     void MakeLight(){var o=new GameObject("Warm Sun");var l=o.AddComponent<Light>();l.type=LightType.Directional;l.intensity=1.25f;l.color=new Color(1f,.91f,.76f);o.transform.rotation=Quaternion.Euler(48,-35,0);}
