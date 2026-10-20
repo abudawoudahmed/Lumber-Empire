@@ -8,13 +8,16 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     Transform player;
     Camera cam;
     Animator animator;
+    AnimatorOverrideController runtimeController;
+    AnimationClip walkClip;
+    AnimationClip runClip;
     bool wasMoving;
     bool wasRunning;
     float moveHeldTime;
 
     const float WalkSpeed = 2.6f;
-    const float RunSpeed = 5.0f;
-    const float RunDelay = 0.75f;
+    const float RunSpeed = 6.2f;
+    const float RunDelay = 30.0f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart()
@@ -33,14 +36,11 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     void Update()
     {
         if (player == null) return;
-
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         Vector3 d = new Vector3(input.x,0,input.y).normalized;
         bool moving = d.sqrMagnitude > .01f;
 
-        if (moving) moveHeldTime += Time.deltaTime;
-        else moveHeldTime = 0f;
-
+        moveHeldTime = moving ? moveHeldTime + Time.deltaTime : 0f;
         bool running = moving && moveHeldTime >= RunDelay;
         float speed = running ? RunSpeed : WalkSpeed;
 
@@ -53,11 +53,24 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         if (animator != null)
         {
             if (!moving && wasMoving)
-                animator.CrossFade("Idle", .14f, 0, 0f);
-            else if (moving && (!wasMoving || running != wasRunning))
-                animator.CrossFade(running ? "Running" : "Walking", .12f, 0, 0f);
+            {
+                animator.speed = 0f;
+                animator.Play("Walking",0,0.08f);
+                animator.Update(0f);
+            }
+            else if (moving && !wasMoving)
+            {
+                SetMovementClip(walkClip);
+                animator.speed = 1f;
+                animator.Play("Walking",0,0f);
+            }
+            else if (moving && running != wasRunning)
+            {
+                SetMovementClip(running ? runClip : walkClip);
+                animator.speed = running ? 1.25f : 1f;
+                animator.Play("Walking",0,0f);
+            }
         }
-
         wasMoving = moving;
         wasRunning = running;
 
@@ -68,18 +81,24 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         }
     }
 
+    void SetMovementClip(AnimationClip clip)
+    {
+        if (runtimeController == null || clip == null) return;
+        runtimeController["Walking"] = clip;
+    }
+
     void MakePlayer()
     {
         GameObject prefab = null;
 #if UNITY_EDITOR
         prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Prefabs/Character 06.prefab");
+        walkClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Walking.anim");
+        runClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Running.anim");
 #endif
         if (prefab == null) prefab = Resources.Load<GameObject>("Lumberjack/Character 06");
         if (prefab == null) { Debug.LogError("Character 06 prefab not found."); return; }
 
         var root = new GameObject("Lumberjack Player");
-        root.transform.position = Vector3.zero;
-
         var obj = Instantiate(prefab, root.transform);
         obj.name = "Character 06 Visual";
         obj.transform.localPosition = Vector3.zero;
@@ -91,13 +110,17 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         {
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            runtimeController = new AnimatorOverrideController(animator.runtimeAnimatorController);
+            animator.runtimeAnimatorController = runtimeController;
+            SetMovementClip(walkClip);
             animator.Rebind();
-            animator.Update(0f);
-            animator.Play("Idle", 0, 0f);
+            animator.speed = 0f;
+            // Freeze a neutral upright frame from the walk clip instead of the pack's crouched Idle pose.
+            animator.Play("Walking",0,0.08f);
             animator.Update(0f);
         }
 
-        GroundVisual(obj, root.transform.position.y);
+        GroundVisual(obj, 0f);
         player = root.transform;
     }
 
