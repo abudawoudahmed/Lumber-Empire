@@ -16,7 +16,7 @@ public class LumberPrototypeBootstrap : MonoBehaviour
 
     const float WalkSpeed=2.6f;
     const float RunSpeed=7.2f;
-    const float RunDelay=2f; // verification: restore to 30 after run animation is confirmed
+    const float RunDelay=3f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart(){if(FindFirstObjectByType<LumberPrototypeBootstrap>()==null)new GameObject("Lumber Empire Demo").AddComponent<LumberPrototypeBootstrap>();}
@@ -24,7 +24,7 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     void Update(){if(player==null)return;Vector2 input=new(Input.GetAxisRaw("Horizontal"),Input.GetAxisRaw("Vertical"));Vector3 d=new Vector3(input.x,0,input.y).normalized;bool moving=d.sqrMagnitude>.01f;moveHeldTime=moving?moveHeldTime+Time.deltaTime:0f;bool running=moving&&moveHeldTime>=RunDelay;float speed=running?RunSpeed:WalkSpeed;if(moving){player.position+=d*speed*Time.deltaTime;player.rotation=Quaternion.Slerp(player.rotation,Quaternion.LookRotation(d),12f*Time.deltaTime);}if(animator!=null){if(!moving&&wasMoving)FreezeStandingPose();else if(moving&&!wasMoving)StartWalking();else if(running&&!wasRunning)StartRunning();}wasMoving=moving;wasRunning=running;if(cam!=null){Vector3 target=player.position+new Vector3(9.5f,11f,-9.5f);cam.transform.position=Vector3.Lerp(cam.transform.position,target,5f*Time.deltaTime);}}
     void StopRunGraph(){if(runGraphActive&&runGraph.IsValid()){runGraph.Destroy();runGraphActive=false;}if(animator!=null)animator.runtimeAnimatorController=normalController;}
     void StartWalking(){StopRunGraph();animator.speed=1f;animator.Play("Walking",0,0f);animator.Update(0f);}
-    void StartRunning(){if(runClip==null){Debug.LogError("RUNNING TEST FAILED: Running.anim not loaded");return;}StopRunGraph();var playable=AnimationPlayableUtilities.PlayClip(animator,runClip,out runGraph);playable.SetSpeed(1.25);runGraphActive=true;Debug.Log("RUNNING TEST ACTIVE - REAL Running.anim");}
+    void StartRunning(){if(runClip==null){Debug.LogError("Running.anim not loaded");return;}StopRunGraph();var playable=AnimationPlayableUtilities.PlayClip(animator,runClip,out runGraph);playable.SetSpeed(1.25);runGraphActive=true;}
     void FreezeStandingPose(){StopRunGraph();animator.speed=1f;animator.Play("Walking",0,.08f);animator.Update(0f);animator.speed=0f;}
     void OnDestroy(){if(runGraphActive&&runGraph.IsValid())runGraph.Destroy();}
     void MakePlayer(){GameObject prefab=null;
