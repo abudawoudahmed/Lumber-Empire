@@ -8,9 +8,13 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     Transform player;
     Camera cam;
     Animator animator;
-    AnimationClip idleClip;
-    AnimationClip walkClip;
     bool wasMoving;
+    bool wasRunning;
+    float moveHeldTime;
+
+    const float WalkSpeed = 2.6f;
+    const float RunSpeed = 5.0f;
+    const float RunDelay = 0.75f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoStart()
@@ -29,21 +33,33 @@ public class LumberPrototypeBootstrap : MonoBehaviour
     void Update()
     {
         if (player == null) return;
+
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         Vector3 d = new Vector3(input.x,0,input.y).normalized;
         bool moving = d.sqrMagnitude > .01f;
 
+        if (moving) moveHeldTime += Time.deltaTime;
+        else moveHeldTime = 0f;
+
+        bool running = moving && moveHeldTime >= RunDelay;
+        float speed = running ? RunSpeed : WalkSpeed;
+
         if (moving)
         {
-            player.position += d * 3.0f * Time.deltaTime;
-            player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(d), 11f * Time.deltaTime);
+            player.position += d * speed * Time.deltaTime;
+            player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(d), 12f * Time.deltaTime);
         }
 
-        if (animator != null && moving != wasMoving)
+        if (animator != null)
         {
-            animator.CrossFade(moving ? "Walking" : "Idle", .12f, 0, 0f);
+            if (!moving && wasMoving)
+                animator.CrossFade("Idle", .14f, 0, 0f);
+            else if (moving && (!wasMoving || running != wasRunning))
+                animator.CrossFade(running ? "Running" : "Walking", .12f, 0, 0f);
         }
+
         wasMoving = moving;
+        wasRunning = running;
 
         if (cam != null)
         {
@@ -57,14 +73,13 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         GameObject prefab = null;
 #if UNITY_EDITOR
         prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Prefabs/Character 06.prefab");
-        idleClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Idle.anim");
-        walkClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Hodaart/HodaartLowPolyCharacterCollection3/Animations/Walking.anim");
 #endif
         if (prefab == null) prefab = Resources.Load<GameObject>("Lumberjack/Character 06");
         if (prefab == null) { Debug.LogError("Character 06 prefab not found."); return; }
 
         var root = new GameObject("Lumberjack Player");
         root.transform.position = Vector3.zero;
+
         var obj = Instantiate(prefab, root.transform);
         obj.name = "Character 06 Visual";
         obj.transform.localPosition = Vector3.zero;
@@ -76,22 +91,23 @@ public class LumberPrototypeBootstrap : MonoBehaviour
         {
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-            animator.Play("Idle",0,0f);
+            animator.Rebind();
+            animator.Update(0f);
+            animator.Play("Idle", 0, 0f);
             animator.Update(0f);
         }
 
-        // The supplied character prefab has its visual origin below the soles.
-        // Measure the rendered feet after scale/pose and lift only the visual child,
-        // keeping the gameplay root exactly on ground Y=0.
-        var renderers = obj.GetComponentsInChildren<Renderer>();
-        if (renderers.Length > 0)
-        {
-            float minY = float.PositiveInfinity;
-            foreach (var r in renderers) minY = Mathf.Min(minY, r.bounds.min.y);
-            obj.transform.position += Vector3.up * (root.transform.position.y - minY + .02f);
-        }
-
+        GroundVisual(obj, root.transform.position.y);
         player = root.transform;
+    }
+
+    void GroundVisual(GameObject visual, float groundY)
+    {
+        var renderers = visual.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+        float minY = float.PositiveInfinity;
+        foreach (var r in renderers) minY = Mathf.Min(minY, r.bounds.min.y);
+        visual.transform.position += Vector3.up * (groundY - minY + .02f);
     }
 
     void MakeGround(){var g=GameObject.CreatePrimitive(PrimitiveType.Plane);g.name="Forest Clearing";g.transform.localScale=new Vector3(3.2f,1,3.2f);g.GetComponent<Renderer>().material.color=new Color(.36f,.64f,.25f);}
