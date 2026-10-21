@@ -2,7 +2,8 @@ name: Unity WebGL Preview
 
 on:
   push:
-    branches: [unity-prototype]
+    branches:
+      - unity-prototype
   workflow_dispatch:
 
 permissions:
@@ -11,15 +12,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: github-pages
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,21 +35,20 @@ jobs:
           targetPlatform: WebGL
           buildsPath: build
 
-      - name: Locate WebGL index
-        id: webgl
+      - name: Prepare Pages root
         shell: bash
         run: |
-          set -e
-          INDEX="$(find build -type f -name index.html | head -n 1)"
+          set -euo pipefail
+          INDEX=$(find build -type f -name index.html -print -quit)
           if [ -z "$INDEX" ]; then
-            echo "No WebGL index.html found"
-            find build -maxdepth 4 -type f | sort | head -n 200
+            echo "Unity WebGL index.html was not found"
             exit 1
           fi
-          WEBGL_DIR="$(dirname "$INDEX")"
-          echo "Found WebGL site at: $WEBGL_DIR"
-          echo "dir=$WEBGL_DIR" >> "$GITHUB_OUTPUT"
-          test -f "$WEBGL_DIR/index.html"
+          SITE_DIR=$(dirname "$INDEX")
+          echo "Publishing $SITE_DIR"
+          mkdir -p pages-root
+          cp -a "$SITE_DIR"/. pages-root/
+          test -f pages-root/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -59,7 +56,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ steps.webgl.outputs.dir }}
+          path: pages-root
 
       - name: Deploy to GitHub Pages
         id: deployment
