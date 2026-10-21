@@ -24,6 +24,15 @@ jobs:
         with:
           lfs: true
 
+      - name: Enable GitHub Pages WebGL decompression fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS="ProjectSettings/ProjectSettings.asset"
+          grep -q '^  webGLDecompressionFallback:' "$SETTINGS"
+          sed -i 's/^  webGLDecompressionFallback: .*/  webGLDecompressionFallback: 1/' "$SETTINGS"
+          grep '^  webGLDecompressionFallback: 1' "$SETTINGS"
+
       - name: Build Unity WebGL
         uses: game-ci/unity-builder@v6
         env:
