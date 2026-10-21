@@ -17,6 +17,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,13 +37,29 @@ jobs:
           targetPlatform: WebGL
           buildsPath: build
 
+      - name: Locate WebGL index
+        id: webgl
+        shell: bash
+        run: |
+          set -e
+          INDEX="$(find build -type f -name index.html | head -n 1)"
+          if [ -z "$INDEX" ]; then
+            echo "No WebGL index.html found"
+            find build -maxdepth 4 -type f | sort | head -n 200
+            exit 1
+          fi
+          WEBGL_DIR="$(dirname "$INDEX")"
+          echo "Found WebGL site at: $WEBGL_DIR"
+          echo "dir=$WEBGL_DIR" >> "$GITHUB_OUTPUT"
+          test -f "$WEBGL_DIR/index.html"
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/WebGL
+          path: ${{ steps.webgl.outputs.dir }}
 
       - name: Deploy to GitHub Pages
         id: deployment
