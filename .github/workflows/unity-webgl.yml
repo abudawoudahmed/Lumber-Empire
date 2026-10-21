@@ -47,7 +47,6 @@ jobs:
           unityVersion: 6000.6.6f1
           targetPlatform: WebGL
           buildsPath: build
-          cacheUnityInstallationOnMac: false
 
       - name: Prepare Pages root
         shell: bash
