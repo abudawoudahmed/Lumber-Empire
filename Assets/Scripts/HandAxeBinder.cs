@@ -13,18 +13,27 @@ public class HandAxeBinder : MonoBehaviour
 
     IEnumerator Start()
     {
-        for(int i=0;i<300&&!bound;i++){
+        for(int i=0;i<600&&!bound;i++){
             var p=GameObject.Find("Lumberjack Player");
-            var a=GameObject.Find("Axe Pivot");
+            var a=FindInactiveByName("Axe Pivot");
             if(p!=null&&a!=null){
-                hand=FindHand(p.transform);
+                Animator anim=p.GetComponentInChildren<Animator>(true);
+                if(anim!=null&&anim.isHuman) hand=anim.GetBoneTransform(HumanBodyBones.RightHand);
+                if(hand==null) hand=FindHand(p.transform);
                 if(hand!=null){
-                    axe=a.transform; originalParent=axe.parent; originalPos=axe.localPosition; originalRot=axe.localRotation;
+                    axe=a; originalParent=axe.parent; originalPos=axe.localPosition; originalRot=axe.localRotation;
                     bound=true; Debug.Log("Axe hand binding ready: "+hand.name);
                 }
             }
             if(!bound)yield return null;
         }
+    }
+
+    Transform FindInactiveByName(string target)
+    {
+        foreach(var t in Resources.FindObjectsOfTypeAll<Transform>())
+            if(t.gameObject.scene.IsValid()&&t.name==target)return t;
+        return null;
     }
 
     void LateUpdate()
@@ -37,19 +46,18 @@ public class HandAxeBinder : MonoBehaviour
 
     IEnumerator HandSwing()
     {
-        // Keep the axe visibly locked to the real right hand while the existing chop timing runs.
         axe.SetParent(hand,false);
-        axe.localPosition=new Vector3(.02f,.08f,.02f);
-        axe.localRotation=Quaternion.Euler(0,0,95);
+        axe.localPosition=new Vector3(.02f,.05f,.02f);
+        axe.localRotation=Quaternion.Euler(8,4,96);
         Quaternion rest=hand.localRotation;
-        Quaternion wind=rest*Quaternion.Euler(-45,5,-55);
-        Quaternion hit=rest*Quaternion.Euler(60,-5,40);
+        Quaternion wind=rest*Quaternion.Euler(-55,8,-60);
+        Quaternion hit=rest*Quaternion.Euler(68,-8,45);
         float t=0;
-        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/0.14f;hand.localRotation=Quaternion.Slerp(rest,wind,t);yield return null;}
+        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/.13f;hand.localRotation=Quaternion.Slerp(rest,wind,t);yield return null;}
         t=0;
-        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/0.12f;hand.localRotation=Quaternion.Slerp(wind,hit,t);yield return null;}
+        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/.11f;hand.localRotation=Quaternion.Slerp(wind,hit,t);yield return null;}
         t=0;
-        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/0.16f;hand.localRotation=Quaternion.Slerp(hit,rest,t);yield return null;}
+        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/.15f;hand.localRotation=Quaternion.Slerp(hit,rest,t);yield return null;}
         hand.localRotation=rest;
         if(axe!=null){axe.SetParent(originalParent,false);axe.localPosition=originalPos;axe.localRotation=originalRot;}
     }
