@@ -32,6 +32,10 @@ jobs:
           grep -q '^  webGLDecompressionFallback:' "$SETTINGS"
           sed -i 's/^  webGLDecompressionFallback: .*/  webGLDecompressionFallback: 1/' "$SETTINGS"
           grep '^  webGLDecompressionFallback: 1' "$SETTINGS"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$SETTINGS"
+          git commit -m "ci: enable WebGL decompression fallback" --no-verify
 
       - name: Build Unity WebGL
         uses: game-ci/unity-builder@v6
