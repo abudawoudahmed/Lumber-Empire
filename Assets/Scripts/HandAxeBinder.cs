@@ -3,63 +3,65 @@ using UnityEngine;
 
 public class HandAxeBinder : MonoBehaviour
 {
-    Transform axe;
-    Transform hand;
-    Vector3 handBaseEuler;
-    Coroutine swing;
+    Transform axe, hand, originalParent;
+    Vector3 originalPos;
+    Quaternion originalRot;
+    bool lastActive, bound;
 
-    public void Setup(Transform axeTransform)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void Install(){new GameObject("Hand Axe Runtime Binder").AddComponent<HandAxeBinder>();}
+
+    IEnumerator Start()
     {
-        axe = axeTransform;
-        hand = FindHand(transform);
-        if (hand == null || axe == null) return;
-
-        handBaseEuler = hand.localEulerAngles;
-        axe.SetParent(hand, false);
-        axe.localPosition = new Vector3(0.03f, 0.10f, 0.02f);
-        axe.localRotation = Quaternion.Euler(0f, 0f, 95f);
-        axe.gameObject.SetActive(false);
+        for(int i=0;i<300&&!bound;i++){
+            var p=GameObject.Find("Lumberjack Player");
+            var a=GameObject.Find("Axe Pivot");
+            if(p!=null&&a!=null){
+                hand=FindHand(p.transform);
+                if(hand!=null){
+                    axe=a.transform; originalParent=axe.parent; originalPos=axe.localPosition; originalRot=axe.localRotation;
+                    bound=true; Debug.Log("Axe hand binding ready: "+hand.name);
+                }
+            }
+            if(!bound)yield return null;
+        }
     }
 
-    public void Chop()
+    void LateUpdate()
     {
-        if (hand == null || axe == null) return;
-        if (swing != null) StopCoroutine(swing);
-        swing = StartCoroutine(Swing());
+        if(!bound||axe==null||hand==null)return;
+        bool active=axe.gameObject.activeSelf;
+        if(active&&!lastActive)StartCoroutine(HandSwing());
+        lastActive=active;
     }
 
-    IEnumerator Swing()
+    IEnumerator HandSwing()
     {
-        axe.gameObject.SetActive(true);
-        Quaternion rest = Quaternion.Euler(handBaseEuler);
-        Quaternion windup = rest * Quaternion.Euler(-35f, 0f, -45f);
-        Quaternion strike = rest * Quaternion.Euler(55f, 0f, 35f);
-
-        for (float t = 0; t < 1; t += Time.deltaTime / 0.16f) {
-            hand.localRotation = Quaternion.Slerp(rest, windup, t);
-            yield return null;
-        }
-        for (float t = 0; t < 1; t += Time.deltaTime / 0.12f) {
-            hand.localRotation = Quaternion.Slerp(windup, strike, t);
-            yield return null;
-        }
-        for (float t = 0; t < 1; t += Time.deltaTime / 0.18f) {
-            hand.localRotation = Quaternion.Slerp(strike, rest, t);
-            yield return null;
-        }
-        hand.localRotation = rest;
-        axe.gameObject.SetActive(false);
-        swing = null;
+        // Keep the axe visibly locked to the real right hand while the existing chop timing runs.
+        axe.SetParent(hand,false);
+        axe.localPosition=new Vector3(.02f,.08f,.02f);
+        axe.localRotation=Quaternion.Euler(0,0,95);
+        Quaternion rest=hand.localRotation;
+        Quaternion wind=rest*Quaternion.Euler(-45,5,-55);
+        Quaternion hit=rest*Quaternion.Euler(60,-5,40);
+        float t=0;
+        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/0.14f;hand.localRotation=Quaternion.Slerp(rest,wind,t);yield return null;}
+        t=0;
+        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/0.12f;hand.localRotation=Quaternion.Slerp(wind,hit,t);yield return null;}
+        t=0;
+        while(t<1&&axe!=null&&axe.gameObject.activeSelf){t+=Time.deltaTime/0.16f;hand.localRotation=Quaternion.Slerp(hit,rest,t);yield return null;}
+        hand.localRotation=rest;
+        if(axe!=null){axe.SetParent(originalParent,false);axe.localPosition=originalPos;axe.localRotation=originalRot;}
     }
 
     Transform FindHand(Transform root)
     {
-        Transform best = null;
-        foreach (Transform t in root.GetComponentsInChildren<Transform>(true)) {
-            string n = t.name.ToLowerInvariant();
-            if (n.Contains("righthand") || n.Contains("right_hand") || n.Contains("hand_r") || n == "hand.r") return t;
-            if (best == null && n.Contains("hand") && (n.Contains("right") || n.Contains("_r") || n.EndsWith(" r"))) best = t;
+        Transform fallback=null;
+        foreach(var t in root.GetComponentsInChildren<Transform>(true)){
+            string n=t.name.ToLowerInvariant().Replace(" ","");
+            if(n.Contains("righthand")||n.Contains("hand_r")||n.Contains("hand.r")||n.Contains("r_hand"))return t;
+            if(fallback==null&&n.Contains("hand")&&(n.Contains("right")||n.EndsWith("r")))fallback=t;
         }
-        return best;
+        return fallback;
     }
 }
