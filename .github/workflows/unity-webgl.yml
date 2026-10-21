@@ -49,6 +49,12 @@ jobs:
           restore-keys: |
             unity-library-webgl-
 
+      - name: Ignore restored Library in git status
+        shell: bash
+        run: |
+          echo '/Library/' >> .git/info/exclude
+          test -z "$(git status --porcelain)"
+
       - name: Build Unity WebGL
         uses: game-ci/unity-builder@v6
         env:
