@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Reflection;
 using UnityEngine;
 
 public class ReferenceViewPolish : MonoBehaviour
@@ -14,30 +13,22 @@ public class ReferenceViewPolish : MonoBehaviour
         yield return null;
 
         Camera cam=Camera.main;
-        if(cam!=null){
-            cam.orthographic=true;
-            cam.orthographicSize=10.8f;
-            cam.transform.rotation=Quaternion.Euler(43f,-42f,0f);
-        }
+        if(cam!=null){cam.orthographic=true;cam.orthographicSize=10.8f;cam.transform.rotation=Quaternion.Euler(43f,-42f,0f);}
 
-        // Remove the oversized old covered sawmill. The open table-saw line remains.
         var old=GameObject.Find("SAWMILL");
-        if(old!=null){
-            var line=FindFirstObjectByType<SawmillProcessingLine>();
-            if(line!=null)Destroy(old);
-        }
+        if(old!=null){var line=FindFirstObjectByType<SawmillProcessingLine>();if(line!=null)Destroy(old);}
 
-        // Make the work area read as an open yard like the reference video.
+        // Brown soil only under the planted forest block.
+        var forest=GameObject.Find("Forest Plot");
+        if(forest!=null)Paint(forest,new Color(.38f,.24f,.12f));
+
+        // Production yard is deliberately separated from the forest by roughly three grid spaces.
         var yard=GameObject.CreatePrimitive(PrimitiveType.Cube);
         yard.name="Open Production Yard";
-        yard.transform.position=new Vector3(5.3f,.025f,1.5f);
-        yard.transform.localScale=new Vector3(11f,.05f,9f);
+        yard.transform.position=new Vector3(9.2f,.025f,3.2f);
+        yard.transform.localScale=new Vector3(9.2f,.05f,7.0f);
         Paint(yard,new Color(.48f,.57f,.61f));
         Destroy(yard.GetComponent<Collider>());
-
-        // Keep production props above the yard surface.
-        var station=GameObject.Find("Table Saw Processing Area");
-        if(station!=null)station.transform.position=new Vector3(5.3f,.06f,1.5f);
     }
 
     Material Mat(Color c){Shader s=Shader.Find("Universal Render Pipeline/Lit");if(s==null)s=Shader.Find("Sprites/Default");var m=new Material(s);m.color=c;return m;}
