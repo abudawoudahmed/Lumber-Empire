@@ -75,7 +75,7 @@ jobs:
           unityVersion: 6000.6.6f1
           targetPlatform: WebGL
           buildsPath: build
-          cliVersion: 1.3.0
+          cliVersion: v0.1.72
 
       - name: Prepare Pages root
         shell: bash
