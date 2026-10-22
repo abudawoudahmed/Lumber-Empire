@@ -41,17 +41,16 @@ jobs:
           fi
           test -z "$(git status --porcelain)"
 
-      - name: Restore Unity Library cache
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: unity-library-webgl-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            unity-library-webgl-
-
-      - name: Ignore restored Library in git status
+      # Do not restore the Unity Library cache here. On the hosted runner the
+      # restored ~600 MB Library causes a large import-time memory spike and
+      # Unity is killed with exit 137 before compilation starts. A clean import
+      # is slower, but much more predictable for this small prototype.
+      - name: Clean Unity generated data
         shell: bash
         run: |
+          set -euo pipefail
+          rm -rf Library Temp obj build
+          mkdir -p Library
           echo '/Library/' >> .git/info/exclude
           test -z "$(git status --porcelain)"
 
