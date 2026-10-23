@@ -14,11 +14,11 @@ public class BackpackLogPolish : MonoBehaviour
         foreach(Transform log in anchor.transform)
         {
             if(log.name!="Back Log")continue;
-            int layer=i/4,slot=i%4;
-            log.localPosition=new Vector3((slot-1.5f)*.09f,layer*.095f,0);
+            int layer=i/3, slot=i%3;
+            log.localPosition=new Vector3((slot-1f)*.12f,layer*.13f,0);
             log.localRotation=Quaternion.Euler(0,0,90);
-            // Force one fixed compact size every frame so later logs never grow back.
-            log.localScale=new Vector3(.065f,.17f,.065f);
+            // Every piece uses exactly the same short, chunky proportions.
+            log.localScale=new Vector3(.095f,.20f,.095f);
             i++;
         }
     }
