@@ -5,69 +5,52 @@ using UnityEngine;
 public class GameplayPaceTuner : MonoBehaviour
 {
     LumberPrototypeBootstrap game;
-    MethodInfo addLogs;
+    MethodInfo addLogs, refreshBackpack;
     FieldInfo carriedLogsField;
-    FieldInfo playerField;
-    int lastTreeCount = -1;
-    int lastVisualCount = -1;
-    Transform extraStack;
-    readonly List<GameObject> extraLogs = new List<GameObject>();
+    readonly Dictionary<TreeNode,int> previousHits = new Dictionary<TreeNode,int>();
+    int previousTreeCount = -1;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Install(){ new GameObject("Gameplay Pace Tuner").AddComponent<GameplayPaceTuner>(); }
+    static void Install(){ new GameObject("Three Hit Harvest Balance").AddComponent<GameplayPaceTuner>(); }
 
     void Update()
     {
-        if(game==null){
+        if(game==null)
+        {
             game=FindFirstObjectByType<LumberPrototypeBootstrap>();
             if(game==null)return;
             var flags=BindingFlags.Instance|BindingFlags.NonPublic;
             addLogs=typeof(LumberPrototypeBootstrap).GetMethod("AddLogs",flags);
+            refreshBackpack=typeof(LumberPrototypeBootstrap).GetMethod("RefreshBackpack",flags);
             carriedLogsField=typeof(LumberPrototypeBootstrap).GetField("carriedLogs",flags);
-            playerField=typeof(LumberPrototypeBootstrap).GetField("player",flags);
         }
 
         var trees=FindObjectsByType<TreeNode>(FindObjectsSortMode.None);
-        foreach(var tree in trees) if(!tree.felled && tree.hitsLeft>1) tree.hitsLeft=1;
-
-        int count=trees.Length;
-        if(lastTreeCount>=0 && count<lastTreeCount && addLogs!=null){
-            int felled=lastTreeCount-count;
-            // Base game gives 3 logs; add 5 more so each tree gives 8 total.
-            for(int i=0;i<felled;i++) addLogs.Invoke(game,new object[]{5});
+        foreach(var tree in trees)
+        {
+            if(tree==null||tree.felled)continue;
+            int old;
+            if(!previousHits.TryGetValue(tree,out old)) previousHits[tree]=tree.hitsLeft;
+            else if(tree.hitsLeft<old)
+            {
+                int hits=old-tree.hitsLeft;
+                for(int i=0;i<hits;i++) addLogs?.Invoke(game,new object[]{1});
+                previousHits[tree]=tree.hitsLeft;
+            }
         }
-        lastTreeCount=count;
 
-        int carried=carriedLogsField!=null?(int)carriedLogsField.GetValue(game):0;
-        if(carried!=lastVisualCount){ RefreshExtraStack(carried); lastVisualCount=carried; }
-    }
+        // The original prototype awards three logs when the tree object disappears.
+        // Remove that legacy reward: the player already received exactly one log per hit.
+        if(previousTreeCount>=0 && trees.Length<previousTreeCount && carriedLogsField!=null)
+        {
+            int removed=previousTreeCount-trees.Length;
+            int carried=(int)carriedLogsField.GetValue(game);
+            carriedLogsField.SetValue(game,Mathf.Max(0,carried-3*removed));
+            refreshBackpack?.Invoke(game,null);
+        }
+        previousTreeCount=trees.Length;
 
-    void RefreshExtraStack(int carried)
-    {
-        foreach(var g in extraLogs) if(g!=null) Destroy(g);
-        extraLogs.Clear();
-        if(carried<=12)return;
-        Transform player=playerField!=null?playerField.GetValue(game) as Transform:null;
-        if(player==null)return;
-        if(extraStack==null){
-            var root=new GameObject("Extra Wood Stack");
-            root.transform.SetParent(player,false);
-            root.transform.localPosition=new Vector3(0,1.0f,-.42f);
-            extraStack=root.transform;
-        }
-        int visible=Mathf.Min(carried,32);
-        for(int i=12;i<visible;i++){
-            var log=GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            log.name="Stack Log";
-            log.transform.SetParent(extraStack,false);
-            int layer=i/4,slot=i%4;
-            log.transform.localPosition=new Vector3((slot-1.5f)*.18f,layer*.20f,0);
-            log.transform.localRotation=Quaternion.Euler(0,0,90);
-            log.transform.localScale=new Vector3(.12f,.42f,.12f);
-            var r=log.GetComponent<Renderer>();
-            if(r!=null){var shader=Shader.Find("Universal Render Pipeline/Lit");if(shader==null)shader=Shader.Find("Sprites/Default");var m=new Material(shader);m.color=new Color(.57f,.33f,.14f);r.material=m;}
-            Destroy(log.GetComponent<Collider>());
-            extraLogs.Add(log);
-        }
+        var oldExtra=GameObject.Find("Extra Wood Stack");
+        if(oldExtra!=null)Destroy(oldExtra);
     }
 }
